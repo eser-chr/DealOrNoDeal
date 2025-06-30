@@ -22,7 +22,8 @@ mod helpers {
         println!("{msg}");
         io::stdout().flush().unwrap();
         io::stdin().read_line(buf).unwrap();
-        println!("\n {}n", "=".repeat(40));
+        clear_screen();
+        println!("\n {}\n", "=".repeat(40));
     }
 
     pub fn read_case_number(cases: &Cases) -> u8 {
@@ -86,9 +87,9 @@ impl Player {
             &format!(
                 "{}",
                 helpers::format_banner(
-                &"🎉 !!! Welcome to SUPER DEAL !!! 🎉 \n Please write your name: "
-                    .bold()
-                    .red()
+                    &"🎉 !!! Welcome to SUPER DEAL !!! 🎉 \n Please write your name: "
+                        .bold()
+                        .red()
                 )
             ),
             &mut buf,
@@ -182,8 +183,9 @@ impl Cases {
         }
     }
 
-    fn is_valid(&self, cas_idx: u8) -> bool {
-        self.cases[cas_idx as usize].is_in
+    fn is_valid(&self, index: u8) -> bool {
+        let idx = (index - 1) as usize;
+        idx < self.cases.len() && self.cases[idx].is_in
     }
 
     fn mean(&self) -> f32 {
@@ -229,7 +231,6 @@ fn main() {
                 Action::RoundEnded
             }
             Action::RoundEnded => {
-                helpers::clear_screen();
                 round += 1;
 
                 if cases.get_len_of_valid() == 0 {
@@ -262,7 +263,8 @@ fn main() {
             Action::OfferAccept(val) => Action::End(val),
             Action::OfferDeny => Action::RemoveCase,
             Action::End(val) => {
-                println!("You won {} E!", val);
+                println!("{}", "Well, done!".bold());
+                println!("You won {} 💰!", val);
                 break;
             }
         };
