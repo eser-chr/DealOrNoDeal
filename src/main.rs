@@ -1,16 +1,77 @@
+use colored::*;
 use rand::seq::SliceRandom;
 use std::array;
 
+const NUM_CASES: u8 = 26;
+
 mod helpers {
+    use crate::Cases;
+    use colored::*;
     use std::io::{self, Write};
-    pub fn oi(msg: &str, buf: &mut String) {
+
+    pub fn format_banner(title: &str) -> String {
+        format!(
+            "{}\n{}\n{}",
+            "=".repeat(40),
+            title.bold().cyan(),
+            "=".repeat(40)
+        )
+    }
+
+    pub fn prompt_oi(msg: &str, buf: &mut String) {
         println!("{msg}");
         io::stdout().flush().unwrap();
         io::stdin().read_line(buf).unwrap();
-        println!("\n ###########\n")
+        println!("\n {}n", "=".repeat(40));
     }
 
-    // pub fn oi_case_
+    pub fn read_case_number(cases: &Cases) -> u8 {
+        loop {
+            let mut buf = String::new();
+            prompt_oi("Please enter a number from 1-26!", &mut buf);
+
+            match buf.trim().parse::<u8>() {
+                Ok(val) => {
+                    if (1..=super::NUM_CASES).contains(&val) && cases.is_valid(val) {
+                        break val;
+                    } else if (1..=super::NUM_CASES).contains(&val) {
+                        println!(
+                            "{}",
+                            "This number is already out of the game!".yellow().bold()
+                        );
+                    } else {
+                        println!("{}", "Not valid number!".red().bold());
+                    }
+                }
+                _ => {
+                    continue;
+                }
+            }
+        }
+    }
+
+    pub fn read_yes_no() -> bool {
+        loop {
+            let mut buf = String::new();
+            prompt_oi(&format!("{}", " [y/n] ".bold()), &mut buf);
+
+            match buf.trim().to_lowercase().as_str() {
+                "y" => break true,
+                "yes" => break true,
+
+                "n" => break false,
+                "no" => break false,
+
+                _ => {
+                    continue;
+                }
+            }
+        }
+    }
+
+    pub fn clear_screen() {
+        print!("\x1B[2J\x1B[1;1H");
+    }
 }
 
 struct Player {
@@ -21,64 +82,47 @@ struct Player {
 impl Player {
     fn from_cli() -> Self {
         let mut buf = String::new();
-        helpers::oi("Welcome to Super Deal! Please write your name: ", &mut buf);
+        helpers::prompt_oi(
+            &format!(
+                "{}",
+                helpers::format_banner(
+                &"🎉 !!! Welcome to SUPER DEAL !!! 🎉 \n Please write your name: "
+                    .bold()
+                    .red()
+                )
+            ),
+            &mut buf,
+        );
         let name = buf.trim().to_string();
         Self { name, case: 0 }
     }
 
     fn pick_case(&mut self, cases: &mut Cases) {
-        println!("So are you ready to play {}?", self.name);
-
-        let case: u8 = loop {
-            let mut buf = String::new();
-            helpers::oi("Please enter a number from 1-26!", &mut buf);
-
-            match buf.trim().parse::<u8>() {
-                Ok(val) if (1..=26).contains(&val) => break val,
-                _ => {
-                    continue;
-                }
-            }
-        };
-
+        println!(
+            "{}",
+            format!(
+                "So... Are you ready to play {} and win HALF a MILLION?",
+                self.name.to_uppercase().bold()
+            )
+        );
+        println!("{}", "First, you have to pick your case!".bold());
+        let case = helpers::read_case_number(cases);
         self.case = case;
-        cases.remove_case(case);
-    }
-
-    fn deal_handle(&self, offer: f32) -> bool {
-        print!("I offer you {} E. Do we have a deal?", offer);
-        let is_deal: bool = loop {
-            let mut buf = String::new();
-            helpers::oi(" [y/n] ", &mut buf);
-
-            match buf.trim() {
-                "y" => break true,
-                "n" => break false,
-                _ => {
-                    continue;
-                }
-            }
-        };
-        is_deal
+        cases.remove_case(case - 1, RemovalMode::Silent);
     }
 
     fn remove_case(&self, cases: &mut Cases) {
-        println!("Choose a bag to remove: ");
+        println!("{}", "Choose a case 💼 to remove: ".underline());
+        println!("{}", "💼 Remaining Cases 💼".bold());
+
         cases.print_valid();
+        let case = helpers::read_case_number(cases);
+        cases.remove_case(case - 1, RemovalMode::Announce);
+    }
 
-        let case: u8 = loop {
-            let mut buf = String::new();
-            helpers::oi("Please enter a number from 1-26!", &mut buf);
-
-            match buf.trim().parse::<u8>() {
-                Ok(val) if (1..=26).contains(&val) => break val,
-                _ => {
-                    continue;
-                }
-            }
-        };
-
-        cases.remove_case(case);
+    fn deal_handle(&self, offer: f32) -> bool {
+        print!("\n💰 BANKER'S OFFER: {:.2} €. Deal?", offer);
+        helpers::read_yes_no()
     }
 }
 
@@ -93,9 +137,12 @@ impl Case {
     }
 }
 
+enum RemovalMode {
+    Silent,
+    Announce,
+}
 struct Cases {
     cases: [Case; 26],
-    valid_indices: Vec<u8>,
 }
 
 impl Cases {
@@ -108,43 +155,51 @@ impl Cases {
 
         let mut rng = rand::rng();
         values.shuffle(&mut rng);
-
         let cases: [Case; 26] = array::from_fn(|i| Case::new(values[i]));
-        let valid_indices: Vec<u8> = (1..=26).collect();
-        Self {
-            cases,
-            valid_indices,
-        }
+        Self { cases }
     }
 
     fn print_valid(&self) {
-        for i in self.valid_indices.iter() {
-            print!("{i} ");
-        }
-    }
-
-    fn remove_case(&mut self, case_idx: u8) {
-        self.valid_indices.retain(|x| *x != case_idx);
-        self.cases[case_idx as usize].is_in = false;
-    }
-
-    fn get_mean(&self) -> f32 {
-        let mut sum = 0.0;
-        for case in &self.cases {
+        for (i, case) in self.cases.iter().enumerate() {
             if case.is_in {
-                sum += case.money;
+                print!("{} ", i + 1);
             }
         }
+    }
 
-        sum / (self.valid_indices.len() as f32)
+    fn remove_case(&mut self, case_idx: u8, show_case_content: RemovalMode) {
+        let val = self.cases[case_idx as usize].money;
+        self.cases[case_idx as usize].is_in = false;
+        match show_case_content {
+            RemovalMode::Announce => {
+                println!(
+                    "You opened case {}. It contained 💸 {} 💰 \n",
+                    case_idx + 1,
+                    val
+                );
+            }
+            _ => {}
+        }
+    }
+
+    fn is_valid(&self, cas_idx: u8) -> bool {
+        self.cases[cas_idx as usize].is_in
+    }
+
+    fn mean(&self) -> f32 {
+        let sum: f32 = self.cases.iter().filter(|c| c.is_in).map(|c| c.money).sum();
+        sum / (self.get_len_of_valid() as f32)
+    }
+
+    fn get_len_of_valid(&self) -> usize {
+        self.cases.iter().filter(|c| c.is_in).count()
     }
 }
 
 struct Banker;
 impl Banker {
     fn make_offer(&self, cases: &Cases) -> f32 {
-        0.4 * cases.get_mean()
-        // 10.0
+        0.4 * cases.mean()
     }
 }
 
@@ -153,25 +208,16 @@ enum Action {
     RemoveCase,
     BankOffer,
     OfferDecision(f32),
-    OfferAccept,
+    OfferAccept(f32),
     OfferDeny,
     RoundEnded,
-    End,
-}
-
-fn decide_next_action(round: usize) -> Action {
-    if round % 4 == 0 {
-        Action::BankOffer
-    } else {
-        Action::RemoveCase
-    }
+    End(f32),
 }
 
 fn main() {
     let mut player = Player::from_cli();
     let mut cases = Cases::new();
     let banker: Banker = Banker {};
-    // player.pick_case(& mut cases);
 
     let mut round: usize = 0;
     let mut action: Action = Action::PickCase;
@@ -183,8 +229,18 @@ fn main() {
                 Action::RoundEnded
             }
             Action::RoundEnded => {
+                helpers::clear_screen();
                 round += 1;
-                decide_next_action(round)
+
+                if cases.get_len_of_valid() == 0 {
+                    Action::End(cases.cases[(player.case - 1) as usize].money)
+                } else if round % 4 == 0 {
+                    Action::BankOffer
+                } else {
+                    Action::RemoveCase
+                }
+
+                // decide_next_action(round)
             }
             Action::RemoveCase => {
                 player.remove_case(&mut cases);
@@ -198,15 +254,15 @@ fn main() {
             Action::OfferDecision(val) => {
                 let is_deal = player.deal_handle(val);
                 if is_deal {
-                    Action::OfferAccept
+                    Action::OfferAccept(val)
                 } else {
                     Action::OfferDeny
                 }
             }
-            Action::OfferAccept => Action::End,
+            Action::OfferAccept(val) => Action::End(val),
             Action::OfferDeny => Action::RemoveCase,
-            Action::End => {
-                println!("You won !");
+            Action::End(val) => {
+                println!("You won {} E!", val);
                 break;
             }
         };
