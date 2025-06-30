@@ -1,6 +1,6 @@
-# 💼 Super Deal
+# 💼 Deal or No Deal
 
-**Super Deal** is a Rust-based CLI implementation of the classic game show *Deal or No Deal*. Choose a mystery case, eliminate others, and negotiate with the banker to walk away with the highest offer — or risk everything to see what your case holds.
+**Deal or No Deal** is a Rust-based CLI implementation of the classic TV game show. Choose a mystery case, eliminate others, and negotiate with the banker to walk away with the highest offer — or risk everything to see what your case holds.
 
 ---
 
